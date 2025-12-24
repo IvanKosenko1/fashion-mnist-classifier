@@ -9,3 +9,6 @@ fire
 onnx
 onnxruntime
 scikit-learn
+pillow
+onnxscript
+

@@ -65,7 +65,13 @@ class Commands:
         onnx_path = export_to_onnx(export_config)
         print(f"Saved ONNX model: {onnx_path}")
 
-    def infer_onnx(self, config_name: str = "base", overrides: str | None = None, image_path: str | None = None, test_index: int = 0) -> None:
+    def infer_onnx(
+        self,
+        config_name: str = "base",
+        overrides: str | None = None,
+        image_path: str | None = None,
+        test_index: int = 0,
+    ) -> None:
         override_list = parse_overrides(overrides)
         config = load_config(config_name=config_name, overrides=override_list)
 
@@ -78,7 +84,9 @@ class Commands:
             predicted_class, confidence, label_name = infer_from_image_path(
                 infer_config, Path(image_path)
             )
-            print(f"predicted_class={predicted_class} label={label_name} confidence={confidence:.4f}")
+            print(
+                f"predicted_class={predicted_class} label={label_name} confidence={confidence:.4f}"
+            )
             return
 
         true_label, predicted_class, confidence, label_name = infer_from_test_sample(
@@ -88,11 +96,7 @@ class Commands:
             f"true_label={true_label} predicted_class={predicted_class} "
             f"label={label_name} confidence={confidence:.4f}"
         )
-
-
-        result = train_model(training_config)
-        print(f"Saved checkpoint: {result['checkpoint_path']}")
-        print(f"Saved metrics: {result['metrics_path']}")
+        return
 
 
 def main() -> None:

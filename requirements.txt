@@ -1,0 +1,11 @@
+﻿torch
+torchvision
+numpy
+pyyaml
+tqdm
+hydra-core
+omegaconf
+fire
+onnx
+onnxruntime
+scikit-learn

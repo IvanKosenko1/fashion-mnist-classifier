@@ -1,0 +1,21 @@
+﻿seed: 42
+device: cpu
+
+data:
+  batch_size: 128
+  num_workers: 2
+
+train:
+  epochs: 5
+  lr: 0.001
+  weight_decay: 0.0
+
+model:
+  name: simple_cnn
+  dropout: 0.2
+
+paths:
+  dataset_dir: artifacts/datasets
+  checkpoint_dir: artifacts/checkpoints
+  onnx_dir: artifacts/onnx
+  metrics_dir: artifacts/metrics

@@ -1,0 +1,53 @@
+﻿# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Pytest
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / coverage
+*.log
+.coverage
+htmlcov/
+
+# Hydra outputs
+outputs/
+multirun/
+
+# Project artifacts (DO NOT COMMIT)
+artifacts/
+
+# Explicit ML artifacts
+*.onnx
+*.pt
+*.pth
+*.h5
+*.ckpt
+*.csv
+*.json

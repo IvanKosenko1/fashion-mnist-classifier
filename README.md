@@ -23,7 +23,7 @@
 
 ## Структура репозитория
 
-```
+```text
 fashion-mnist-classifier/
   fashion_mnist_classifier/
     __init__.py
@@ -42,6 +42,11 @@ fashion-mnist-classifier/
     checkpoints/
     onnx/
     metrics/
+  deploy/
+    triton/
+      make_model_repo.py
+      client_http.py
+      model_repository/      # создаётся локально, в git не попадает
   requirements.txt
   README.md
   .gitignore
@@ -119,6 +124,7 @@ python -m fashion_mnist_classifier.commands export_onnx
 
 Выход:
 - `artifacts/onnx/model.onnx`
+- при необходимости также `artifacts/onnx/model.onnx.data` (external data)
 
 ### 4) Инференс ONNX Runtime
 
@@ -130,7 +136,7 @@ python -m fashion_mnist_classifier.commands infer_onnx --test_index=123
 
 Пример вывода:
 
-```
+```text
 true_label=9 predicted_class=9 label=Ankle boot confidence=0.9986
 ```
 
@@ -162,6 +168,88 @@ python -m fashion_mnist_classifier.commands infer_onnx --image_path="D:\path\to\
 - чекпоинты: `artifacts/checkpoints/`
 - ONNX модель: `artifacts/onnx/`
 - метрики: `artifacts/metrics/`
+
+## Inference server (Triton, CPU)
+
+Ниже приведён пример поднятия сервера инференса для экспортированной ONNX-модели с помощью **NVIDIA Triton Inference Server** через Docker. Запуск выполняется в **CPU-режиме** (без NVIDIA GPU).
+
+### Предусловия
+- Docker Desktop запущен (`docker info` работает).
+- ONNX модель экспортирована в `artifacts/onnx/`:
+
+```powershell
+python -m fashion_mnist_classifier.commands export_onnx
+```
+
+### 1) Подготовка model repository для Triton
+
+Сгенерировать `config.pbtxt` и скопировать ONNX-модель в репозиторий Triton:
+
+```powershell
+python .\deploy\triton\make_model_repo.py build --model_name fashion_mnist
+```
+
+Если ONNX был сохранён с external data (рядом лежит `model.onnx.data`), скопируйте его в ту же папку версии модели:
+
+```powershell
+Copy-Item artifacts\onnx\model.onnx.data deploy\triton\model_repository\fashion_mnist\1\model.onnx.data -Force
+```
+
+Проверка, что файлы на месте:
+
+```powershell
+dir deploy\triton\model_repository\fashion_mnist\1
+```
+
+### 2) Исправление config.pbtxt (CPU + TYPE_FP32 + UTF-8 без BOM)
+
+Triton читает `config.pbtxt` как protobuf text-format. Частые причины падений на Windows:
+- `data_type` должен быть `TYPE_FP32` (а не `FP32`)
+- `instance_group.kind` должен быть `KIND_CPU` для CPU-режима
+- файл должен быть в UTF-8 **без BOM** (иначе protobuf-парсер падает на первом символе)
+
+Команда для автоматического исправления:
+
+```powershell
+$p = "deploy\triton\model_repository\fashion_mnist\config.pbtxt"
+$txt = Get-Content $p -Raw
+$txt = $txt -replace "KIND_GPU", "KIND_CPU"
+$txt = $txt -replace "data_type:\s*FP32", "data_type: TYPE_FP32"
+[System.IO.File]::WriteAllText($p, $txt, (New-Object System.Text.UTF8Encoding($false)))
+```
+
+### 3) Запуск Triton Server (HTTP / gRPC / metrics)
+
+Откройте отдельный терминал и запустите Triton:
+
+```powershell
+docker run --rm --shm-size=1g `
+  -p 8000:8000 -p 8001:8001 -p 8002:8002 `
+  -v "${PWD}\deploy\triton\model_repository:/models" `
+  nvcr.io/nvidia/tritonserver:25.10-py3 `
+  tritonserver --model-repository=/models
+```
+
+Проверка готовности сервера:
+
+```powershell
+curl http://localhost:8000/v2/health/ready
+```
+
+Ожидаемый результат: `OK`.
+
+### 4) Тестовый запрос (HTTP)
+
+В другом терминале:
+
+```powershell
+python .\deploy\triton\client_http.py infer --server_url "http://localhost:8000" --model_name "fashion_mnist" --test_index 0
+```
+
+Ожидаемый результат: вывод содержит предсказанный класс, например `pred=9`.
+
+### Примечание про артефакты
+Файлы `deploy/triton/model_repository/**/model.onnx` и `model.onnx.data` являются артефактами модели и не должны коммититься в git.
 
 ## Метрики
 

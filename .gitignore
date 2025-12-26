@@ -51,3 +51,27 @@ artifacts/
 *.ckpt
 *.csv
 *.json
+
+# Model artifacts
+artifacts/tensorrt/
+*.plan
+*.engine
+
+# Triton model repo artifacts (model weights)
+deploy/triton/model_repository/**/model.onnx
+
+# datasets / caches
+.cache/
+
+# triton local model repository (keep folder structure)
+deploy/triton/model_repository/**
+!deploy/triton/model_repository/**/.gitkeep
+
+# model binaries (safety net)
+*.pt
+*.pth
+*.onnx
+*.onnx.data
+*.plan
+*.engine
+

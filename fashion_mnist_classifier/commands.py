@@ -5,11 +5,14 @@ from pathlib import Path
 import fire
 
 from fashion_mnist_classifier.data import DataConfig, get_dataloaders
+from fashion_mnist_classifier.export_onnx import ExportConfig, export_to_onnx
+from fashion_mnist_classifier.infer import (
+    InferConfig,
+    infer_from_image_path,
+    infer_from_test_sample,
+)
 from fashion_mnist_classifier.train import TrainConfig, train_model
 from fashion_mnist_classifier.utils import load_config, parse_overrides
-from fashion_mnist_classifier.export_onnx import ExportConfig, export_to_onnx
-from fashion_mnist_classifier.infer import InferConfig, infer_from_image_path, infer_from_test_sample
-
 
 
 class Commands:
@@ -33,24 +36,28 @@ class Commands:
 
     def train(self, config_name: str = "base", overrides: str | None = None) -> None:
         override_list = parse_overrides(overrides)
-        config = load_config(config_name=config_name, overrides=override_list)
+        cfg = load_config(config_name=config_name, overrides=override_list)
 
         training_config = TrainConfig(
-            seed=int(config.seed),
-            device=str(config.device),
-            epochs=int(config.train.epochs),
-            lr=float(config.train.lr),
-            weight_decay=float(config.train.weight_decay),
-            dropout=float(config.model.dropout),
-            model_name=str(config.model.name),
-            dataset_dir=Path(str(config.paths.dataset_dir)),
-            checkpoint_dir=Path(str(config.paths.checkpoint_dir)),
-            metrics_dir=Path(str(config.paths.metrics_dir)),
-            batch_size=int(config.data.batch_size),
-            num_workers=int(config.data.num_workers),
+            seed=int(cfg.seed),
+            device=str(cfg.device),
+            epochs=int(cfg.train.epochs),
+            lr=float(cfg.train.lr),
+            weight_decay=float(cfg.train.weight_decay),
+            model_name=str(cfg.model.name),
+            dropout=float(cfg.model.dropout),
+            batch_size=int(cfg.data.batch_size),
+            num_workers=int(cfg.data.num_workers),
+            dataset_dir=Path(cfg.paths.dataset_dir),
+            checkpoint_dir=Path(cfg.paths.checkpoint_dir),
+            metrics_dir=Path(cfg.paths.metrics_dir),
+            onnx_dir=Path(cfg.paths.onnx_dir),
         )
+        train_model(training_config, mlflow_cfg=cfg.mlflow, trainer_cfg=cfg.trainer)
 
-    def export_onnx(self, config_name: str = "base", overrides: str | None = None) -> None:
+    def export_onnx(
+        self, config_name: str = "base", overrides: str | None = None
+    ) -> None:
         override_list = parse_overrides(overrides)
         config = load_config(config_name=config_name, overrides=override_list)
 

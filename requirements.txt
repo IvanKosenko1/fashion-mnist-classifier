@@ -11,4 +11,3 @@ onnxruntime
 scikit-learn
 pillow
 onnxscript
-

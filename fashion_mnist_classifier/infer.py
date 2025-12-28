@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 import onnxruntime as ort
 from PIL import Image
 from torchvision import datasets, transforms
-
 
 FASHION_MNIST_LABELS = [
     "T-shirt/top",
@@ -45,8 +44,12 @@ def _preprocess_pil_image(image: Image.Image) -> np.ndarray:
     return batch.astype(np.float32)
 
 
-def infer_from_image_path(config: InferConfig, image_path: Path) -> Tuple[int, float, str]:
-    session = ort.InferenceSession(str(config.onnx_path), providers=["CPUExecutionProvider"])
+def infer_from_image_path(
+    config: InferConfig, image_path: Path
+) -> Tuple[int, float, str]:
+    session = ort.InferenceSession(
+        str(config.onnx_path), providers=["CPUExecutionProvider"]
+    )
 
     image = Image.open(str(image_path))
     input_tensor = _preprocess_pil_image(image)
@@ -61,8 +64,12 @@ def infer_from_image_path(config: InferConfig, image_path: Path) -> Tuple[int, f
     return predicted_class, confidence, label_name
 
 
-def infer_from_test_sample(config: InferConfig, test_index: int) -> Tuple[int, int, float, str]:
-    session = ort.InferenceSession(str(config.onnx_path), providers=["CPUExecutionProvider"])
+def infer_from_test_sample(
+    config: InferConfig, test_index: int
+) -> Tuple[int, int, float, str]:
+    session = ort.InferenceSession(
+        str(config.onnx_path), providers=["CPUExecutionProvider"]
+    )
 
     transform_pipeline = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]

@@ -1,7 +1,4 @@
-﻿seed: 42
-device: cpu
-
-data:
+﻿data:
   batch_size: 128
   num_workers: 2
 
@@ -15,7 +12,18 @@ model:
   dropout: 0.2
 
 paths:
-  dataset_dir: artifacts/datasets
+  dataset_dir: data/fashion_mnist
   checkpoint_dir: artifacts/checkpoints
-  onnx_dir: artifacts/onnx
   metrics_dir: artifacts/metrics
+  onnx_dir: artifacts/onnx
+
+trainer:
+  accelerator: auto     # cpu/gpu/auto
+  devices: auto         # 1 / auto
+  precision: 32         # 32 / 16-mixed (если будет GPU)
+  log_every_n_steps: 50
+
+mlflow:
+  tracking_uri: "file:./mlruns"
+  experiment_name: "fashion-mnist"
+  run_name: null

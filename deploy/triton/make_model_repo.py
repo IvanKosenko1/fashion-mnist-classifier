@@ -73,7 +73,8 @@ def _write_config_pbtxt(
     output_spec: IoSpec,
     max_batch_size: int,
 ) -> None:
-    config = f'''
+    config = (
+        f"""
 name: "{model_name}"
 platform: "onnxruntime_onnx"
 max_batch_size: {max_batch_size}
@@ -100,7 +101,9 @@ instance_group [
     count: 1
   }}
 ]
-'''.strip() + "\n"
+""".strip()
+        + "\n"
+    )
     (model_dir / "config.pbtxt").write_text(config, encoding="utf-8")
 
 
@@ -126,7 +129,9 @@ def build(
     graph = model.graph
 
     if not graph.input or not graph.output:
-        raise RuntimeError("ONNX graph has no inputs/outputs. Cannot generate Triton config.")
+        raise RuntimeError(
+            "ONNX graph has no inputs/outputs. Cannot generate Triton config."
+        )
 
     input_spec = _parse_io(graph.input[0])
     output_spec = _parse_io(graph.output[0])

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Tuple
 
 import numpy as np
 import torch
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+from lightning.pytorch import Trainer, seed_everything
+from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.loggers import MLFlowLogger
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
 from torch import nn
-from torch.optim import Adam
-from tqdm import tqdm
 
 from fashion_mnist_classifier.data import DataConfig, get_dataloaders
-from fashion_mnist_classifier.model import build_model
+from fashion_mnist_classifier.lit_module import LitFashionMNIST
 
 
 @dataclass(frozen=True)
@@ -67,78 +67,51 @@ def evaluate_model(
     return accuracy, macro_f1, matrix
 
 
-def train_model(config: TrainConfig) -> Dict[str, object]:
-    set_global_seed(config.seed)
+def train_model(config: TrainConfig, mlflow_cfg, trainer_cfg) -> None:
+    seed_everything(config.seed, workers=True)
 
-    device = torch.device(config.device)
     config.checkpoint_dir.mkdir(parents=True, exist_ok=True)
     config.metrics_dir.mkdir(parents=True, exist_ok=True)
 
-    data_config = DataConfig(
+    data_cfg = DataConfig(
         batch_size=config.batch_size,
         num_workers=config.num_workers,
         dataset_dir=config.dataset_dir,
     )
-    train_loader, test_loader = get_dataloaders(data_config)
+    train_loader, test_loader = get_dataloaders(data_cfg)
 
-    model = build_model(model_name=config.model_name, dropout=config.dropout).to(device)
-    loss_function = nn.CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
+    mlf_logger = MLFlowLogger(
+        tracking_uri=str(mlflow_cfg.tracking_uri),
+        experiment_name=str(mlflow_cfg.experiment_name),
+        run_name=(
+            None if mlflow_cfg.run_name in (None, "null") else str(mlflow_cfg.run_name)
+        ),
+    )
 
-    best_macro_f1 = -1.0
-    best_checkpoint_path = config.checkpoint_dir / "best.pt"
+    ckpt = ModelCheckpoint(
+        dirpath=str(config.checkpoint_dir),
+        monitor="val/macro_f1",
+        mode="max",
+        save_top_k=1,
+        filename="best",
+    )
 
-    for epoch_index in range(config.epochs):
-        model.train()
-        epoch_losses: list[float] = []
+    lit = LitFashionMNIST(
+        model_name=config.model_name,
+        dropout=config.dropout,
+        lr=config.lr,
+        weight_decay=config.weight_decay,
+    )
 
-        progress = tqdm(train_loader, desc=f"epoch {epoch_index + 1}/{config.epochs}", leave=False)
-        for images_batch, labels_batch in progress:
-            images_batch = images_batch.to(device)
-            labels_batch = labels_batch.to(device)
+    trainer = Trainer(
+        max_epochs=config.epochs,
+        accelerator=str(trainer_cfg.accelerator),
+        devices=trainer_cfg.devices,
+        precision=trainer_cfg.precision,
+        log_every_n_steps=int(trainer_cfg.log_every_n_steps),
+        logger=mlf_logger,
+        callbacks=[ckpt],
+        enable_checkpointing=True,
+    )
 
-            optimizer.zero_grad(set_to_none=True)
-            logits = model(images_batch)
-            loss_value = loss_function(logits, labels_batch)
-            loss_value.backward()
-            optimizer.step()
-
-            epoch_losses.append(float(loss_value.item()))
-            progress.set_postfix(loss=float(np.mean(epoch_losses)))
-
-        accuracy, macro_f1, matrix = evaluate_model(model, test_loader, device=device)
-
-        if macro_f1 > best_macro_f1:
-            best_macro_f1 = macro_f1
-            torch.save(
-                {
-                    "model_name": config.model_name,
-                    "dropout": config.dropout,
-                    "state_dict": model.state_dict(),
-                },
-                str(best_checkpoint_path),
-            )
-
-        print(
-            f"Epoch {epoch_index + 1}/{config.epochs}: "
-            f"acc={accuracy:.4f} macro_f1={macro_f1:.4f} best_macro_f1={best_macro_f1:.4f}"
-        )
-
-    final_accuracy, final_macro_f1, final_matrix = evaluate_model(model, test_loader, device=device)
-
-    metrics_payload: Dict[str, object] = {
-        "final_accuracy": final_accuracy,
-        "final_macro_f1": final_macro_f1,
-        "best_macro_f1": best_macro_f1,
-        "confusion_matrix": final_matrix.tolist(),
-    }
-
-    metrics_path = config.metrics_dir / "metrics.json"
-    # файл сохранится локально, но в git не попадёт (из-за .gitignore)
-    metrics_path.write_text(json.dumps(metrics_payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    return {
-        "checkpoint_path": str(best_checkpoint_path),
-        "metrics_path": str(metrics_path),
-        "metrics": metrics_payload,
-    }
+    trainer.fit(lit, train_dataloaders=train_loader, val_dataloaders=test_loader)
